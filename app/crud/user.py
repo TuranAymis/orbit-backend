@@ -54,3 +54,40 @@ def create_user(
 
     db.refresh(user)
     return user
+
+
+def update_user_profile(
+    db: Session,
+    *,
+    user: User,
+    full_name: str | None = None,
+    bio: str | None = None,
+    location: str | None = None,
+    avatar_url: str | None = None,
+) -> User:
+    if full_name is not None:
+        user.full_name = full_name.strip()
+    if bio is not None:
+        user.bio = bio.strip()
+    if location is not None:
+        user.location = location.strip()
+    if avatar_url is not None:
+        user.avatar_url = avatar_url.strip()
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_membership_level(
+    db: Session,
+    *,
+    user: User,
+    membership_level: MembershipLevel,
+) -> User:
+    user.membership_level = membership_level
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

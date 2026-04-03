@@ -13,6 +13,7 @@ from app.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.chat import Chat
     from app.models.group import Group
+    from app.models.event_participant import EventParticipant
 
 
 class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -29,12 +30,17 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cover_image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     location: Mapped[str] = mapped_column(String(255), nullable=False)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     group: Mapped["Group"] = relationship(back_populates="events")
     chats: Mapped[list["Chat"]] = relationship(
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+    participants: Mapped[list["EventParticipant"]] = relationship(
         back_populates="event",
         cascade="all, delete-orphan",
     )

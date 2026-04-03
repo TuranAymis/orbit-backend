@@ -14,7 +14,12 @@ from app.utils.enums import MembershipRole, MembershipStatus
 router = APIRouter(prefix="/groups", tags=["Memberships"])
 
 
-@router.post("/{group_id}/members", response_model=MembershipRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{group_id}/members",
+    response_model=MembershipRead,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 def add_group_member(
     group_id: UUID,
     payload: MembershipCreate,
@@ -43,7 +48,7 @@ def add_group_member(
     )
 
 
-@router.get("/{group_id}/members", response_model=list[MembershipRead])
+@router.get("/{group_id}/members", response_model=list[MembershipRead], include_in_schema=False)
 def list_group_members(
     group_id: UUID,
     db: DBSession,

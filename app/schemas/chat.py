@@ -8,14 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class ChatCreate(BaseModel):
     group_id: UUID | None = None
     event_id: UUID | None = None
-    message: str = Field(..., min_length=1, max_length=4000)
+    content: str = Field(..., min_length=1, max_length=4000)
 
-    @field_validator("message")
+    @field_validator("content")
     @classmethod
-    def normalize_message(cls, value: str) -> str:
+    def normalize_content(cls, value: str) -> str:
         stripped_value = value.strip()
         if not stripped_value:
-            raise ValueError("Message cannot be empty.")
+            raise ValueError("content cannot be empty.")
         return stripped_value
 
     @model_validator(mode="after")
@@ -26,11 +26,16 @@ class ChatCreate(BaseModel):
 
 
 class ChatRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: UUID
-    sender_id: UUID
+    group_id: UUID | None = None
+    user_id: UUID
+    username: str
+    content: str
+    created_at: datetime
+
+
+class ChatSeedMessage(BaseModel):
     group_id: UUID | None
     event_id: UUID | None
-    message: str
-    created_at: datetime
+    user_id: UUID
+    content: str

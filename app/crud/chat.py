@@ -42,5 +42,22 @@ def list_chats(
     if sender_id is not None:
         stmt = stmt.where(Chat.sender_id == sender_id)
 
-    stmt = stmt.order_by(Chat.created_at.desc()).limit(limit)
+    stmt = stmt.order_by(Chat.created_at.asc(), Chat.id.asc()).limit(limit)
     return list(db.scalars(stmt).all())
+
+
+def get_chat_by_context_and_message(
+    db: Session,
+    *,
+    sender_id: uuid.UUID,
+    group_id: uuid.UUID | None,
+    event_id: uuid.UUID | None,
+    message: str,
+) -> Chat | None:
+    stmt = select(Chat).where(
+        Chat.sender_id == sender_id,
+        Chat.group_id == group_id,
+        Chat.event_id == event_id,
+        Chat.message == message.strip(),
+    )
+    return db.scalar(stmt)

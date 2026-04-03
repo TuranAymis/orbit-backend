@@ -17,6 +17,17 @@ from app.utils.enums import MembershipStatus
 router = APIRouter(prefix="/chats", tags=["Chats"])
 
 
+def _to_chat_read(chat) -> ChatRead:
+    return ChatRead(
+        id=chat.id,
+        group_id=chat.group_id,
+        user_id=chat.sender_id,
+        username=chat.sender.full_name,
+        content=chat.message,
+        created_at=chat.created_at,
+    )
+
+
 def _resolve_chat_context(
     db: Session,
     *,
@@ -58,26 +69,20 @@ def create_chat(
     db: DBSession,
     current_user: CurrentUser,
 ) -> ChatRead:
-    message = payload.message.strip()
-    if not message:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Message cannot be empty.",
-        )
-
     resolved_group_id, resolved_event_id = _resolve_chat_context(
         db,
         current_user=current_user,
         group_id=payload.group_id,
         event_id=payload.event_id,
     )
-    return chat_crud.create_chat(
+    chat = chat_crud.create_chat(
         db,
         sender_id=current_user.id,
         group_id=resolved_group_id,
         event_id=resolved_event_id,
-        message=message,
+        message=payload.content,
     )
+    return _to_chat_read(chat)
 
 
 @router.get("", response_model=list[ChatRead])
@@ -89,7 +94,8 @@ def list_chats(
     limit: int = Query(100, ge=1, le=200),
 ) -> list[ChatRead]:
     if group_id is None and event_id is None:
-        return chat_crud.list_chats(db, sender_id=current_user.id, limit=limit)
+        chats = chat_crud.list_chats(db, sender_id=current_user.id, limit=limit)
+        return [_to_chat_read(chat) for chat in chats]
 
     resolved_group_id, resolved_event_id = _resolve_chat_context(
         db,
@@ -97,9 +103,10 @@ def list_chats(
         group_id=group_id,
         event_id=event_id,
     )
-    return chat_crud.list_chats(
+    chats = chat_crud.list_chats(
         db,
         group_id=resolved_group_id,
         event_id=resolved_event_id,
         limit=limit,
     )
+    return [_to_chat_read(chat) for chat in chats]

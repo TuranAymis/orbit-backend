@@ -6,8 +6,12 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.chats import router as chats_router
 from app.api.routes.events import router as events_router
 from app.api.routes.groups import router as groups_router
+from app.api.routes.membership import router as membership_router
 from app.api.routes.memberships import router as memberships_router
+from app.api.routes.notifications import router as notifications_router
 from app.api.routes.payments import router as payments_router
+from app.api.routes.profile import router as profile_router
+from app.api.routes.settings import router as settings_router
 from app.api.routes.users import router as users_router
 from app.core.config import settings
 from app.core.exceptions import AppException
@@ -44,6 +48,10 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(auth_router)
+app.include_router(membership_router)
+app.include_router(notifications_router)
+app.include_router(profile_router)
+app.include_router(settings_router)
 app.include_router(users_router)
 app.include_router(groups_router)
 app.include_router(memberships_router)

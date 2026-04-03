@@ -13,10 +13,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
 
 
-def get_password_hash(password: str) -> str:
+def hash_password(password: str) -> str:
     password_bytes = password.encode("utf-8")
     hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
     return hashed_password.decode("utf-8")
+
+
+def get_password_hash(password: str) -> str:
+    return hash_password(password)
 
 
 def create_access_token(

@@ -3,13 +3,23 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentUser, DBSession
+from app.api.deps import CurrentUser, DBSession, OptionalCurrentUser
 from app.core.exceptions import AuthorizationError
 from app.crud import event as event_crud
 from app.crud import group as group_crud
 from app.crud import membership as membership_crud
 from app.models.user import User
-from app.schemas.event import EventCreate, EventRead, EventUpdate
+from app.schemas.event import (
+    EventCreate,
+    EventDetailResponse,
+    EventJoinLeaveResponse,
+    EventListResponse,
+    EventParticipantPreviewResponse,
+    EventParticipantResponse,
+    EventRead,
+    EventRelatedGroupResponse,
+    EventUpdate,
+)
 from app.utils.enums import MembershipRole, MembershipStatus
 
 
@@ -46,25 +56,87 @@ def create_event(
         group_id=payload.group_id,
         title=payload.title,
         description=payload.description,
+        cover_image_url=payload.cover_image_url,
         location=payload.location,
         start_time=payload.start_time,
         end_time=payload.end_time,
     )
 
 
-@router.get("", response_model=list[EventRead])
+@router.get("", response_model=list[EventListResponse])
 def list_events(
     db: DBSession,
+    current_user: OptionalCurrentUser,
     group_id: UUID | None = Query(default=None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
-) -> list[EventRead]:
-    return event_crud.list_events(db, group_id=group_id, skip=skip, limit=limit)
+) -> list[EventListResponse]:
+    events = event_crud.list_events(db, group_id=group_id, skip=skip, limit=limit)
+    return [
+        EventListResponse(
+            id=event.id,
+            title=event.title,
+            description=event.description,
+            cover_image_url=event.cover_image_url,
+            starts_at=event.start_time,
+            ends_at=event.end_time,
+            location=event.location,
+            attendee_count=event_crud.count_event_participants(db, event_id=event.id),
+            is_joined=(
+                current_user is not None
+                and event_crud.get_event_participant(
+                    db,
+                    event_id=event.id,
+                    user_id=current_user.id,
+                )
+                is not None
+            ),
+        )
+        for event in events
+    ]
 
 
-@router.get("/{event_id}", response_model=EventRead)
-def get_event(event_id: UUID, db: DBSession) -> EventRead:
-    return event_crud.get_event(db, event_id)
+@router.get("/{event_id}", response_model=EventDetailResponse)
+def get_event(
+    event_id: UUID,
+    db: DBSession,
+    current_user: OptionalCurrentUser,
+) -> EventDetailResponse:
+    event = event_crud.get_event(db, event_id)
+    participants = event_crud.list_event_participants(db, event_id=event.id)
+    attendee_count = len(participants)
+    return EventDetailResponse(
+        id=event.id,
+        title=event.title,
+        description=event.description,
+        cover_image_url=event.cover_image_url,
+        starts_at=event.start_time,
+        ends_at=event.end_time,
+        location=event.location,
+        attendee_count=attendee_count,
+        is_joined=(
+            current_user is not None
+            and event_crud.get_event_participant(
+                db,
+                event_id=event.id,
+                user_id=current_user.id,
+            )
+            is not None
+        ),
+        related_group=(
+            EventRelatedGroupResponse(id=event.group.id, name=event.group.name)
+            if event.group is not None
+            else None
+        ),
+        participants_preview=[
+            EventParticipantPreviewResponse(
+                id=participant.id,
+                name=participant.full_name,
+                avatar_url=participant.avatar_url,
+            )
+            for participant in participants[:5]
+        ],
+    )
 
 
 @router.put("/{event_id}", response_model=EventRead)
@@ -99,3 +171,42 @@ def delete_event(
     _ensure_group_manager(db, event.group_id, current_user)
     event_crud.delete_event(db, db_obj=event)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{event_id}/join", response_model=EventJoinLeaveResponse)
+def join_event(
+    event_id: UUID,
+    db: DBSession,
+    current_user: CurrentUser,
+) -> EventJoinLeaveResponse:
+    event_crud.get_event(db, event_id)
+    event_crud.ensure_event_participant(db, event_id=event_id, user_id=current_user.id)
+    return EventJoinLeaveResponse(success=True)
+
+
+@router.post("/{event_id}/leave", response_model=EventJoinLeaveResponse)
+def leave_event(
+    event_id: UUID,
+    db: DBSession,
+    current_user: CurrentUser,
+) -> EventJoinLeaveResponse:
+    event_crud.get_event(db, event_id)
+    event_crud.remove_event_participant(db, event_id=event_id, user_id=current_user.id)
+    return EventJoinLeaveResponse(success=True)
+
+
+@router.get("/{event_id}/participants", response_model=list[EventParticipantResponse])
+def list_event_participants(
+    event_id: UUID,
+    db: DBSession,
+    current_user: OptionalCurrentUser,
+) -> list[EventParticipantResponse]:
+    event_crud.get_event(db, event_id)
+    return [
+        EventParticipantResponse(
+            id=participant.id,
+            name=participant.full_name,
+            avatar_url=participant.avatar_url,
+        )
+        for participant in event_crud.list_event_participants(db, event_id=event_id)
+    ]

@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.core.exceptions import AuthenticationError
+from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.schemas.token import TokenPayload
@@ -47,9 +47,23 @@ def get_current_user(
     if user is None:
         raise AuthenticationError("Could not validate credentials.")
     if not user.is_active:
-        raise AuthenticationError("Inactive user account.")
+        raise AuthorizationError("Inactive user account.")
 
     return user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_optional_current_user(
+    db: DBSession,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User | None:
+    if credentials is None:
+        return None
+    if credentials.scheme.lower() != "bearer":
+        raise AuthenticationError("Not authenticated.")
+    return get_current_user(db, credentials)
+
+
+OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]

@@ -15,11 +15,17 @@ def create_group(
     *,
     name: str,
     description: str | None,
+    cover_image_url: str | None,
+    category: str | None,
+    location: str | None,
     owner_id: uuid.UUID,
 ) -> Group:
     group = Group(
         name=name.strip(),
         description=description.strip() if description else None,
+        cover_image_url=cover_image_url.strip() if cover_image_url else None,
+        category=category.strip() if category else None,
+        location=location.strip() if location else None,
         owner_id=owner_id,
     )
     db.add(group)
@@ -74,3 +80,8 @@ def update_group(
 def delete_group(db: Session, *, db_obj: Group) -> None:
     db.delete(db_obj)
     db.commit()
+
+
+def get_group_by_name(db: Session, *, name: str) -> Group | None:
+    stmt = select(Group).where(Group.name == name.strip())
+    return db.scalar(stmt)
