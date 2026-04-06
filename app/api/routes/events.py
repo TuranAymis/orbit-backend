@@ -78,19 +78,30 @@ def _ensure_group_manager(db: Session, group_id: UUID, current_user: User) -> No
         raise AuthorizationError("You must be a group owner or admin to manage events.")
 
 
-def _ensure_event_manager(db: Session, event_id: UUID, current_user: User) -> None:
-    if current_user.role in {UserRole.MODERATOR, UserRole.ADMIN}:
-        return
-
-    if event_moderator_crud.get_event_moderator(
-        db,
-        event_id=event_id,
-        user_id=current_user.id,
-    ) is not None:
-        return
-
+def _ensure_event_deleter(db: Session, event_id: UUID, current_user: User) -> None:
     event = event_crud.get_event(db, event_id)
-    _ensure_group_manager(db, event.group_id, current_user)
+
+    if current_user.role == UserRole.ADMIN:
+        return
+
+    if current_user.role == UserRole.MODERATOR:
+        if group_moderator_crud.get_group_moderator(
+            db,
+            group_id=event.group_id,
+            user_id=current_user.id,
+        ) is not None:
+            return
+
+        if event_moderator_crud.get_event_moderator(
+            db,
+            event_id=event_id,
+            user_id=current_user.id,
+        ) is not None:
+            return
+
+        raise AuthorizationError("You don't have permission to delete this event.")
+
+    raise AuthorizationError("You don't have permission to delete this event.")
 
 
 @router.post("", response_model=EventRead, status_code=status.HTTP_201_CREATED)
@@ -196,7 +207,7 @@ def update_event(
     current_user: CurrentUser,
 ) -> EventRead:
     event = event_crud.get_event(db, event_id)
-    _ensure_event_manager(db, event_id, current_user)
+    _ensure_group_manager(db, event.group_id, current_user)
 
     update_data = payload.model_dump(exclude_unset=True)
     resolved_start_time = update_data.get("start_time", event.start_time)
@@ -217,7 +228,7 @@ def delete_event(
     current_user: CurrentUser,
 ) -> Response:
     event = event_crud.get_event(db, event_id)
-    _ensure_event_manager(db, event_id, current_user)
+    _ensure_event_deleter(db, event_id, current_user)
     event_crud.delete_event(db, db_obj=event)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

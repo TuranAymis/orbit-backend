@@ -131,12 +131,9 @@ def update_group(
 def delete_group(
     group_id: UUID,
     db: DBSession,
-    current_user: CurrentUser,
+    current_user: CurrentAdmin,
 ) -> Response:
     group = group_crud.get_group(db, group_id)
-    if group.owner_id != current_user.id:
-        raise AuthorizationError("Only the group owner can delete this group.")
-
     group_crud.delete_group(db, db_obj=group)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
