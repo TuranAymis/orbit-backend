@@ -6,6 +6,12 @@ class MembershipLevel(str, Enum):
     PAID = "paid"
 
 
+class UserRole(str, Enum):
+    USER = "user"
+    MODERATOR = "moderator"
+    ADMIN = "admin"
+
+
 class MembershipRole(str, Enum):
     MEMBER = "member"
     ADMIN = "admin"

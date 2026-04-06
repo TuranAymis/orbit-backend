@@ -12,6 +12,7 @@ from app.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.chat import Chat
     from app.models.event import Event
+    from app.models.group_moderator import GroupModerator
     from app.models.membership import Membership
     from app.models.user import User
 
@@ -41,6 +42,10 @@ class Group(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
     )
     chats: Mapped[list["Chat"]] = relationship(
+        back_populates="group",
+        cascade="all, delete-orphan",
+    )
+    moderators: Mapped[list["GroupModerator"]] = relationship(
         back_populates="group",
         cascade="all, delete-orphan",
     )

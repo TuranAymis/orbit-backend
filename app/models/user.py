@@ -6,12 +6,14 @@ from sqlalchemy import Boolean, Enum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.utils.enums import MembershipLevel
+from app.utils.enums import MembershipLevel, UserRole
 
 if TYPE_CHECKING:
     from app.models.chat import Chat
     from app.models.event_participant import EventParticipant
+    from app.models.event_moderator import EventModerator
     from app.models.group import Group
+    from app.models.group_moderator import GroupModerator
     from app.models.membership import Membership
     from app.models.notification import Notification
     from app.models.payment import Payment
@@ -36,6 +38,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(MembershipLevel, name="membership_level_enum"),
         nullable=False,
         default=MembershipLevel.FREE,
+    )
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role_enum"),
+        nullable=False,
+        default=UserRole.USER,
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
@@ -62,6 +69,24 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     event_participants: Mapped[list["EventParticipant"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    moderated_groups: Mapped[list["GroupModerator"]] = relationship(
+        foreign_keys="GroupModerator.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    assigned_group_moderators: Mapped[list["GroupModerator"]] = relationship(
+        foreign_keys="GroupModerator.assigned_by",
+        back_populates="assigned_by_user",
+    )
+    moderated_events: Mapped[list["EventModerator"]] = relationship(
+        foreign_keys="EventModerator.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    assigned_event_moderators: Mapped[list["EventModerator"]] = relationship(
+        foreign_keys="EventModerator.assigned_by",
+        back_populates="assigned_by_user",
     )
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="user",

@@ -1,18 +1,16 @@
 import argparse
 from datetime import UTC, datetime, timedelta
 
-from app.core.exceptions import DuplicateResourceError
 from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.crud import event as event_crud
 from app.crud import group as group_crud
 from app.crud import chat as chat_crud
+from app.crud import group_moderator as group_moderator_crud
 from app.crud import membership as membership_crud
 from app.crud import notification as notification_crud
 from app.crud import user as user_crud
-from app.schemas.auth import RegisterRequest
-from app.services.auth_service import register_user
-from app.utils.enums import MembershipLevel, MembershipRole, MembershipStatus
+from app.utils.enums import MembershipLevel, MembershipRole, MembershipStatus, UserRole
 
 
 DEFAULT_USERS = (
@@ -21,12 +19,28 @@ DEFAULT_USERS = (
         "email": "paid@orbit.local",
         "password": "123456",
         "membership_level": MembershipLevel.PAID,
+        "role": UserRole.USER,
     },
     {
         "full_name": "Free Orbit User",
         "email": "free@orbit.local",
         "password": "123456",
         "membership_level": MembershipLevel.FREE,
+        "role": UserRole.USER,
+    },
+    {
+        "full_name": "Orbit Moderator",
+        "email": "moderator@orbit.local",
+        "password": "123456",
+        "membership_level": MembershipLevel.PAID,
+        "role": UserRole.MODERATOR,
+    },
+    {
+        "full_name": "Orbit Admin",
+        "email": "admin@orbit.local",
+        "password": "123456",
+        "membership_level": MembershipLevel.PAID,
+        "role": UserRole.ADMIN,
     },
 )
 
@@ -85,6 +99,14 @@ DEFAULT_GROUPS = (
     },
 )
 
+DEFAULT_GROUP_MODERATORS = (
+    {
+        "group_name": "Orbit Builders",
+        "user_email": "moderator@orbit.local",
+        "assigned_by_email": "admin@orbit.local",
+    },
+)
+
 DEFAULT_NOTIFICATIONS = (
     {
         "user_email": "paid@orbit.local",
@@ -126,6 +148,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[level.value for level in MembershipLevel],
     )
     parser.add_argument(
+        "--role",
+        default=UserRole.USER.value,
+        choices=[role.value for role in UserRole],
+    )
+    parser.add_argument(
         "--default-users",
         action="store_true",
         help="Seed the default paid/free users and demo groups idempotently.",
@@ -133,12 +160,21 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def seed_user(db, *, full_name: str, email: str, password: str, membership_level: MembershipLevel) -> None:
+def seed_user(
+    db,
+    *,
+    full_name: str,
+    email: str,
+    password: str,
+    membership_level: MembershipLevel,
+    role: UserRole,
+) -> None:
     existing_user = user_crud.get_user_by_email(db, email)
     if existing_user is not None:
         existing_user.full_name = full_name.strip()
         existing_user.password_hash = hash_password(password)
         existing_user.membership_level = membership_level
+        existing_user.role = role
         existing_user.is_active = True
         db.add(existing_user)
         db.commit()
@@ -146,19 +182,15 @@ def seed_user(db, *, full_name: str, email: str, password: str, membership_level
         print(f"Updated bootstrap user: {existing_user.email} ({existing_user.id})")
         return
 
-    try:
-        user = register_user(
-            db,
-            payload=RegisterRequest(
-                full_name=full_name,
-                email=email,
-                password=password,
-                membership_level=membership_level,
-            ),
-        )
-        print(f"Created bootstrap user: {user.email} ({user.id})")
-    except DuplicateResourceError:
-        print(f"User already exists: {email}")
+    user = user_crud.create_user(
+        db,
+        full_name=full_name,
+        email=email,
+        password_hash=hash_password(password),
+        membership_level=membership_level,
+        role=role,
+    )
+    print(f"Created bootstrap user: {user.email} ({user.id})")
 
 
 def seed_default_groups(db) -> None:
@@ -277,6 +309,22 @@ def seed_default_groups(db) -> None:
                 )
 
 
+def seed_group_moderators(db) -> None:
+    for assignment in DEFAULT_GROUP_MODERATORS:
+        group = group_crud.get_group_by_name(db, name=assignment["group_name"])
+        user = user_crud.get_user_by_email(db, assignment["user_email"])
+        assigned_by = user_crud.get_user_by_email(db, assignment["assigned_by_email"])
+        if group is None or user is None or assigned_by is None:
+            continue
+
+        group_moderator_crud.ensure_group_moderator(
+            db,
+            group_id=group.id,
+            user_id=user.id,
+            assigned_by=assigned_by.id,
+        )
+
+
 def seed_notifications(db) -> None:
     for notification_data in DEFAULT_NOTIFICATIONS:
         user = user_crud.get_user_by_email(db, notification_data["user_email"])
@@ -338,6 +386,7 @@ def main() -> None:
             for user in DEFAULT_USERS:
                 seed_user(db, **user)
             seed_default_groups(db)
+            seed_group_moderators(db)
             seed_notifications(db)
             return
 
@@ -347,6 +396,7 @@ def main() -> None:
             email=args.email,
             password=args.password,
             membership_level=MembershipLevel(args.membership_level),
+            role=UserRole(args.role),
         )
     finally:
         db.close()

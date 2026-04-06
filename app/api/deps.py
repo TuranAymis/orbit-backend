@@ -13,6 +13,7 @@ from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.schemas.token import TokenPayload
+from app.utils.enums import UserRole
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -67,3 +68,21 @@ def get_optional_current_user(
 
 
 OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]
+
+
+def require_admin(current_user: CurrentUser) -> User:
+    if current_user.role != UserRole.ADMIN:
+        raise AuthorizationError("Admin access is required.")
+    return current_user
+
+
+CurrentAdmin = Annotated[User, Depends(require_admin)]
+
+
+def require_moderator_or_admin(current_user: CurrentUser) -> User:
+    if current_user.role not in {UserRole.MODERATOR, UserRole.ADMIN}:
+        raise AuthorizationError("Moderator or admin access is required.")
+    return current_user
+
+
+CurrentModeratorOrAdmin = Annotated[User, Depends(require_moderator_or_admin)]

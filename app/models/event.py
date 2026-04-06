@@ -13,6 +13,7 @@ from app.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.chat import Chat
     from app.models.group import Group
+    from app.models.event_moderator import EventModerator
     from app.models.event_participant import EventParticipant
 
 
@@ -41,6 +42,10 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
     )
     participants: Mapped[list["EventParticipant"]] = relationship(
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+    moderators: Mapped[list["EventModerator"]] = relationship(
         back_populates="event",
         cascade="all, delete-orphan",
     )

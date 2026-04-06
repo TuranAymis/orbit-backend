@@ -11,7 +11,7 @@ from pydantic import (
     field_validator,
 )
 
-from app.utils.enums import MembershipLevel
+from app.utils.enums import MembershipLevel, UserRole
 
 
 OrbitEmail = EmailStr | Annotated[
@@ -37,6 +37,7 @@ class UserRead(UserBase):
     location: str | None = None
     avatar_url: str | None = None
     membership_level: MembershipLevel
+    role: UserRole
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -53,6 +54,7 @@ class ProfileResponse(BaseModel):
     avatar_url: str | None = None
     is_active: bool
     membership_level: MembershipLevel
+    role: UserRole
     created_at: datetime
     updated_at: datetime
 

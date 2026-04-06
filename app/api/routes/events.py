@@ -3,11 +3,14 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import CurrentUser, DBSession, OptionalCurrentUser
+from app.api.deps import CurrentAdmin, CurrentUser, DBSession, OptionalCurrentUser
 from app.core.exceptions import AuthorizationError
 from app.crud import event as event_crud
+from app.crud import event_moderator as event_moderator_crud
 from app.crud import group as group_crud
+from app.crud import group_moderator as group_moderator_crud
 from app.crud import membership as membership_crud
+from app.crud import user as user_crud
 from app.models.user import User
 from app.schemas.event import (
     EventCreate,
@@ -20,13 +23,44 @@ from app.schemas.event import (
     EventRelatedGroupResponse,
     EventUpdate,
 )
-from app.utils.enums import MembershipRole, MembershipStatus
+from app.utils.enums import MembershipRole, MembershipStatus, UserRole
 
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
 
+def _ensure_event_creator(db: Session, group_id: UUID, current_user: User) -> None:
+    group_crud.get_group(db, group_id)
+
+    if current_user.role == UserRole.ADMIN:
+        return
+
+    if current_user.role == UserRole.MODERATOR:
+        if group_moderator_crud.get_group_moderator(
+            db,
+            group_id=group_id,
+            user_id=current_user.id,
+        ) is not None:
+            return
+
+        raise AuthorizationError(
+            "You must be assigned as a moderator for this group to create events."
+        )
+
+    raise AuthorizationError("Moderator or admin access is required to create events.")
+
+
 def _ensure_group_manager(db: Session, group_id: UUID, current_user: User) -> None:
+    if current_user.role in {UserRole.MODERATOR, UserRole.ADMIN}:
+        return
+
+    if group_moderator_crud.get_group_moderator(
+        db,
+        group_id=group_id,
+        user_id=current_user.id,
+    ) is not None:
+        return
+
     group = group_crud.get_group(db, group_id)
     if group.owner_id == current_user.id:
         return
@@ -44,13 +78,28 @@ def _ensure_group_manager(db: Session, group_id: UUID, current_user: User) -> No
         raise AuthorizationError("You must be a group owner or admin to manage events.")
 
 
+def _ensure_event_manager(db: Session, event_id: UUID, current_user: User) -> None:
+    if current_user.role in {UserRole.MODERATOR, UserRole.ADMIN}:
+        return
+
+    if event_moderator_crud.get_event_moderator(
+        db,
+        event_id=event_id,
+        user_id=current_user.id,
+    ) is not None:
+        return
+
+    event = event_crud.get_event(db, event_id)
+    _ensure_group_manager(db, event.group_id, current_user)
+
+
 @router.post("", response_model=EventRead, status_code=status.HTTP_201_CREATED)
 def create_event(
     payload: EventCreate,
     db: DBSession,
     current_user: CurrentUser,
 ) -> EventRead:
-    _ensure_group_manager(db, payload.group_id, current_user)
+    _ensure_event_creator(db, payload.group_id, current_user)
     return event_crud.create_event(
         db,
         group_id=payload.group_id,
@@ -147,7 +196,7 @@ def update_event(
     current_user: CurrentUser,
 ) -> EventRead:
     event = event_crud.get_event(db, event_id)
-    _ensure_group_manager(db, event.group_id, current_user)
+    _ensure_event_manager(db, event_id, current_user)
 
     update_data = payload.model_dump(exclude_unset=True)
     resolved_start_time = update_data.get("start_time", event.start_time)
@@ -168,7 +217,7 @@ def delete_event(
     current_user: CurrentUser,
 ) -> Response:
     event = event_crud.get_event(db, event_id)
-    _ensure_group_manager(db, event.group_id, current_user)
+    _ensure_event_manager(db, event_id, current_user)
     event_crud.delete_event(db, db_obj=event)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -210,3 +259,38 @@ def list_event_participants(
         )
         for participant in event_crud.list_event_participants(db, event_id=event_id)
     ]
+
+
+@router.post("/{event_id}/moderators/{user_id}", response_model=EventJoinLeaveResponse)
+def assign_event_moderator(
+    event_id: UUID,
+    user_id: UUID,
+    db: DBSession,
+    current_user: CurrentAdmin,
+) -> EventJoinLeaveResponse:
+    event_crud.get_event(db, event_id)
+    user_crud.get_user(db, user_id)
+    event_moderator_crud.ensure_event_moderator(
+        db,
+        event_id=event_id,
+        user_id=user_id,
+        assigned_by=current_user.id,
+    )
+    return EventJoinLeaveResponse(success=True)
+
+
+@router.delete("/{event_id}/moderators/{user_id}", response_model=EventJoinLeaveResponse)
+def remove_event_moderator(
+    event_id: UUID,
+    user_id: UUID,
+    db: DBSession,
+    current_user: CurrentAdmin,
+) -> EventJoinLeaveResponse:
+    event_crud.get_event(db, event_id)
+    user_crud.get_user(db, user_id)
+    event_moderator_crud.remove_event_moderator(
+        db,
+        event_id=event_id,
+        user_id=user_id,
+    )
+    return EventJoinLeaveResponse(success=True)

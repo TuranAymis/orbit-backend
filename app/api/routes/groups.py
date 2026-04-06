@@ -2,11 +2,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Response, status
 
-from app.api.deps import CurrentUser, DBSession
+from app.api.deps import CurrentAdmin, CurrentUser, DBSession
 from app.core.exceptions import AuthorizationError
 from app.crud import event as event_crud
 from app.crud import group as group_crud
+from app.crud import group_moderator as group_moderator_crud
 from app.crud import membership as membership_crud
+from app.crud import user as user_crud
 from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
 from app.schemas.group import (
     GroupDetailResponse,
@@ -29,7 +31,7 @@ router = APIRouter(prefix="/groups", tags=["Groups"])
 def create_group(
     payload: GroupCreate,
     db: DBSession,
-    current_user: CurrentUser,
+    current_user: CurrentAdmin,
 ) -> GroupRead:
     return group_crud.create_group(
         db,
@@ -171,3 +173,38 @@ def list_group_members(
         )
         for user in membership_crud.list_group_users(db, group_id=group_id)
     ]
+
+
+@router.post("/{group_id}/moderators/{user_id}", response_model=GroupJoinResponse)
+def assign_group_moderator(
+    group_id: UUID,
+    user_id: UUID,
+    db: DBSession,
+    current_user: CurrentAdmin,
+) -> GroupJoinResponse:
+    group_crud.get_group(db, group_id)
+    user_crud.get_user(db, user_id)
+    group_moderator_crud.ensure_group_moderator(
+        db,
+        group_id=group_id,
+        user_id=user_id,
+        assigned_by=current_user.id,
+    )
+    return GroupJoinResponse(success=True)
+
+
+@router.delete("/{group_id}/moderators/{user_id}", response_model=GroupJoinResponse)
+def remove_group_moderator(
+    group_id: UUID,
+    user_id: UUID,
+    db: DBSession,
+    current_user: CurrentAdmin,
+) -> GroupJoinResponse:
+    group_crud.get_group(db, group_id)
+    user_crud.get_user(db, user_id)
+    group_moderator_crud.remove_group_moderator(
+        db,
+        group_id=group_id,
+        user_id=user_id,
+    )
+    return GroupJoinResponse(success=True)

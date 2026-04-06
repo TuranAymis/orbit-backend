@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import DuplicateResourceError, ResourceNotFoundError
 from app.models.user import User
-from app.utils.enums import MembershipLevel
+from app.utils.enums import MembershipLevel, UserRole
 
 
 def get_user_by_id(db: Session, user_id: uuid.UUID) -> User | None:
@@ -33,6 +33,7 @@ def create_user(
     email: str,
     password_hash: str,
     membership_level: MembershipLevel,
+    role: UserRole = UserRole.USER,
 ) -> User:
     normalized_email = email.strip().lower()
     if get_user_by_email(db, normalized_email):
@@ -43,6 +44,7 @@ def create_user(
         email=normalized_email,
         password_hash=password_hash,
         membership_level=membership_level,
+        role=role,
     )
     db.add(user)
 
