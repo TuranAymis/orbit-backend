@@ -11,11 +11,11 @@ from app.schemas.membership import MembershipCreate, MembershipRead
 from app.utils.enums import MembershipRole, MembershipStatus
 
 
-router = APIRouter(prefix="/groups", tags=["Memberships"])
+router = APIRouter(prefix="/memberships", tags=["Memberships"])
 
 
 @router.post(
-    "/{group_id}/members",
+    "/groups/{group_id}",
     response_model=MembershipRead,
     status_code=status.HTTP_201_CREATED,
     include_in_schema=False,
@@ -48,7 +48,7 @@ def add_group_member(
     )
 
 
-@router.get("/{group_id}/members", response_model=list[MembershipRead], include_in_schema=False)
+@router.get("/groups/{group_id}", response_model=list[MembershipRead], include_in_schema=False)
 def list_group_members(
     group_id: UUID,
     db: DBSession,

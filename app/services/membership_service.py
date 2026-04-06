@@ -1,8 +1,8 @@
-from datetime import UTC, datetime, time, timedelta
-from decimal import Decimal
+from datetime import UTC, datetime, time
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import AppException
 from app.crud import payment as payment_crud
 from app.crud import user as user_crud
 from app.models.user import User
@@ -43,24 +43,19 @@ def get_membership_overview(db: Session, *, user: User) -> MembershipOverviewRes
 
 
 def upgrade_membership(db: Session, *, user: User) -> MembershipUpgradeResponse:
+    latest_payment = payment_crud.get_latest_completed_payment_for_user(db, user_id=user.id)
+    if latest_payment is None:
+        raise AppException("A completed payment is required before upgrading membership.")
+
+    today = datetime.now(UTC).date()
+    if latest_payment.start_date > today or latest_payment.end_date < today:
+        raise AppException("Your completed payment is not active for the current billing period.")
+
     if user.membership_level != MembershipLevel.PAID:
         user = user_crud.update_membership_level(
             db,
             user=user,
             membership_level=MembershipLevel.PAID,
-        )
-
-    latest_payment = payment_crud.get_latest_completed_payment_for_user(db, user_id=user.id)
-    if latest_payment is None:
-        start_date = datetime.now(UTC).date()
-        end_date = start_date + timedelta(days=30)
-        payment_crud.create_completed_membership_payment(
-            db,
-            user_id=user.id,
-            amount=Decimal("19.99"),
-            currency="USD",
-            start_date=start_date,
-            end_date=end_date,
         )
 
     return MembershipUpgradeResponse(success=True, tier="premium")
