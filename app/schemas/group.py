@@ -88,3 +88,11 @@ class GroupMemberResponse(BaseModel):
     id: UUID
     name: str
     avatar_url: str | None = None
+
+
+class GroupMembershipMutationResponse(BaseModel):
+    success: bool
+    group_id: UUID
+    is_joined: bool
+    member_count: int
+    action: str

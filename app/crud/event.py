@@ -142,13 +142,14 @@ def remove_event_participant(
     *,
     event_id: uuid.UUID,
     user_id: uuid.UUID,
-) -> None:
+) -> bool:
     participant = get_event_participant(db, event_id=event_id, user_id=user_id)
     if participant is None:
-        return
+        return False
 
     db.delete(participant)
     db.commit()
+    return True
 
 
 def list_event_participants(

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, Response, status
 
 from app.api.deps import CurrentAdmin, CurrentUser, DBSession
 from app.core.exceptions import AuthorizationError
+from app.crud import chat_room_state as chat_room_state_crud
 from app.crud import event as event_crud
 from app.crud import group as group_crud
 from app.crud import group_moderator as group_moderator_crud
@@ -16,11 +17,12 @@ from app.schemas.group import (
     GroupFounderResponse,
     GroupJoinResponse,
     GroupListResponse,
+    GroupMembershipMutationResponse,
     GroupMemberPreviewResponse,
     GroupMemberResponse,
     GroupStatsResponse,
 )
-from app.utils.enums import MembershipRole, MembershipStatus
+from app.utils.enums import ChatRoomType, MembershipRole, MembershipStatus
 from datetime import UTC, datetime
 
 
@@ -134,17 +136,33 @@ def delete_group(
     current_user: CurrentAdmin,
 ) -> Response:
     group = group_crud.get_group(db, group_id)
+    for event in group.events:
+        chat_room_state_crud.delete_chat_room_states_for_room(
+            db,
+            room_type=ChatRoomType.EVENT,
+            room_id=event.id,
+        )
+    chat_room_state_crud.delete_chat_room_states_for_room(
+        db,
+        room_type=ChatRoomType.GROUP,
+        room_id=group_id,
+    )
     group_crud.delete_group(db, db_obj=group)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/{group_id}/members", response_model=GroupJoinResponse)
+@router.post("/{group_id}/members", response_model=GroupMembershipMutationResponse)
 def join_group(
     group_id: UUID,
     db: DBSession,
     current_user: CurrentUser,
-) -> GroupJoinResponse:
+) -> GroupMembershipMutationResponse:
     group_crud.get_group(db, group_id)
+    existing_membership = membership_crud.get_membership_by_user_group(
+        db,
+        user_id=current_user.id,
+        group_id=group_id,
+    )
     membership_crud.ensure_group_membership(
         db,
         user_id=current_user.id,
@@ -152,7 +170,34 @@ def join_group(
         role=MembershipRole.MEMBER,
         status=MembershipStatus.ACTIVE,
     )
-    return GroupJoinResponse(success=True)
+    return GroupMembershipMutationResponse(
+        success=True,
+        group_id=group_id,
+        is_joined=True,
+        member_count=membership_crud.count_memberships_by_group(db, group_id=group_id),
+        action="already_joined" if existing_membership is not None else "joined",
+    )
+
+
+@router.delete("/{group_id}/members/me", response_model=GroupMembershipMutationResponse)
+def leave_group(
+    group_id: UUID,
+    db: DBSession,
+    current_user: CurrentUser,
+) -> GroupMembershipMutationResponse:
+    group_crud.get_group(db, group_id)
+    removed = membership_crud.remove_group_membership(
+        db,
+        user_id=current_user.id,
+        group_id=group_id,
+    )
+    return GroupMembershipMutationResponse(
+        success=True,
+        group_id=group_id,
+        is_joined=False,
+        member_count=membership_crud.count_memberships_by_group(db, group_id=group_id),
+        action="left" if removed else "already_left",
+    )
 
 
 @router.get("/{group_id}/members", response_model=list[GroupMemberResponse])

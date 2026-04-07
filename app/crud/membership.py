@@ -111,3 +111,18 @@ def ensure_group_membership(
         role=role,
         status=status,
     )
+
+
+def remove_group_membership(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    group_id: uuid.UUID,
+) -> bool:
+    membership = get_membership_by_user_group(db, user_id=user_id, group_id=group_id)
+    if membership is None:
+        return False
+
+    db.delete(membership)
+    db.commit()
+    return True

@@ -28,3 +28,8 @@ class PaymentStatus(str, Enum):
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class ChatRoomType(str, Enum):
+    GROUP = "group"
+    EVENT = "event"

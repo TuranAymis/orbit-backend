@@ -18,6 +18,22 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "change-this-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    EMAIL_VERIFICATION_CODE_EXPIRE_MINUTES: int = 10
+    EMAIL_VERIFICATION_MAX_ATTEMPTS: int = 5
+    EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: int = 60
+    AUTH_REGISTER_RATE_LIMIT_WINDOW_MINUTES: int = 60
+    AUTH_REGISTER_RATE_LIMIT_MAX_ATTEMPTS: int = 3
+    AUTH_RESEND_RATE_LIMIT_WINDOW_MINUTES: int = 15
+    AUTH_RESEND_RATE_LIMIT_MAX_ATTEMPTS: int = 3
+    AUTH_VERIFY_RATE_LIMIT_WINDOW_MINUTES: int = 15
+    AUTH_VERIFY_RATE_LIMIT_MAX_ATTEMPTS: int = 10
+    EMAIL_SENDER_MODE: str = "console"
+    EMAIL_FROM: str = "no-reply@orbit.local"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True
     BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:3000",

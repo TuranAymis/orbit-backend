@@ -37,3 +37,8 @@ class AuthenticationError(AppException):
 class AuthorizationError(AppException):
     status_code = status.HTTP_403_FORBIDDEN
     detail = "You do not have permission to perform this action."
+
+
+class RateLimitError(AppException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    detail = "Too many requests. Please try again later."

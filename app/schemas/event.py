@@ -104,3 +104,11 @@ class EventParticipantResponse(BaseModel):
     id: UUID
     name: str
     avatar_url: str | None = None
+
+
+class EventAttendanceMutationResponse(BaseModel):
+    success: bool
+    event_id: UUID
+    is_joined: bool
+    attendee_count: int
+    action: str

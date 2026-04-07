@@ -34,6 +34,7 @@ def create_user(
     password_hash: str,
     membership_level: MembershipLevel,
     role: UserRole = UserRole.USER,
+    is_active: bool = True,
 ) -> User:
     normalized_email = email.strip().lower()
     if get_user_by_email(db, normalized_email):
@@ -45,6 +46,7 @@ def create_user(
         password_hash=password_hash,
         membership_level=membership_level,
         role=role,
+        is_active=is_active,
     )
     db.add(user)
 
@@ -89,6 +91,14 @@ def update_membership_level(
     membership_level: MembershipLevel,
 ) -> User:
     user.membership_level = membership_level
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def activate_user(db: Session, *, user: User) -> User:
+    user.is_active = True
     db.add(user)
     db.commit()
     db.refresh(user)

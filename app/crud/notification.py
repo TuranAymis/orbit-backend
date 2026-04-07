@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ResourceNotFoundError
@@ -106,3 +106,43 @@ def get_notification_by_signature(
         Notification.message == message.strip(),
     )
     return db.scalar(stmt)
+
+
+def create_notifications_batch(
+    db: Session,
+    *,
+    payloads: list[dict],
+) -> list[Notification]:
+    if not payloads:
+        return []
+
+    notifications = [Notification(**payload) for payload in payloads]
+    db.add_all(notifications)
+    db.commit()
+    for notification in notifications:
+        db.refresh(notification)
+    return notifications
+
+
+def mark_notifications_as_read_for_entity(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    type: str,
+    related_entity_type: str,
+    related_entity_id: uuid.UUID,
+) -> int:
+    stmt = (
+        update(Notification)
+        .where(
+            Notification.user_id == user_id,
+            Notification.type == type.strip(),
+            Notification.related_entity_type == related_entity_type.strip(),
+            Notification.related_entity_id == related_entity_id,
+            Notification.is_read.is_(False),
+        )
+        .values(is_read=True)
+    )
+    result = db.execute(stmt)
+    db.commit()
+    return int(result.rowcount or 0)

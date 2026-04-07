@@ -9,7 +9,10 @@ from app.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.utils.enums import MembershipLevel, UserRole
 
 if TYPE_CHECKING:
+    from app.models.auth_audit_log import AuthAuditLog
     from app.models.chat import Chat
+    from app.models.chat_room_state import ChatRoomState
+    from app.models.email_verification_code import EmailVerificationCode
     from app.models.event_participant import EventParticipant
     from app.models.event_moderator import EventModerator
     from app.models.group import Group
@@ -66,6 +69,10 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="sender",
         cascade="all, delete-orphan",
     )
+    chat_room_states: Mapped[list["ChatRoomState"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     event_participants: Mapped[list["EventParticipant"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -96,4 +103,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    auth_audit_logs: Mapped[list["AuthAuditLog"]] = relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
+    email_verification_codes: Mapped[list["EmailVerificationCode"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )

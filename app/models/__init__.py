@@ -1,4 +1,7 @@
+from app.models.auth_audit_log import AuthAuditLog
 from app.models.chat import Chat
+from app.models.chat_room_state import ChatRoomState
+from app.models.email_verification_code import EmailVerificationCode
 from app.models.event import Event
 from app.models.event_moderator import EventModerator
 from app.models.event_participant import EventParticipant
@@ -22,4 +25,7 @@ __all__ = [
     "EventParticipant",
     "GroupModerator",
     "Chat",
+    "ChatRoomState",
+    "AuthAuditLog",
+    "EmailVerificationCode",
 ]

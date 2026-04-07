@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentAdmin, CurrentUser, DBSession, OptionalCurrentUser
 from app.core.exceptions import AuthorizationError
+from app.crud import chat_room_state as chat_room_state_crud
 from app.crud import event as event_crud
 from app.crud import event_moderator as event_moderator_crud
 from app.crud import group as group_crud
@@ -15,6 +16,7 @@ from app.models.user import User
 from app.schemas.event import (
     EventCreate,
     EventDetailResponse,
+    EventAttendanceMutationResponse,
     EventJoinLeaveResponse,
     EventListResponse,
     EventParticipantPreviewResponse,
@@ -23,7 +25,7 @@ from app.schemas.event import (
     EventRelatedGroupResponse,
     EventUpdate,
 )
-from app.utils.enums import MembershipRole, MembershipStatus, UserRole
+from app.utils.enums import ChatRoomType, MembershipRole, MembershipStatus, UserRole
 
 
 router = APIRouter(prefix="/events", tags=["Events"])
@@ -229,30 +231,56 @@ def delete_event(
 ) -> Response:
     event = event_crud.get_event(db, event_id)
     _ensure_event_deleter(db, event_id, current_user)
+    chat_room_state_crud.delete_chat_room_states_for_room(
+        db,
+        room_type=ChatRoomType.EVENT,
+        room_id=event_id,
+    )
     event_crud.delete_event(db, db_obj=event)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/{event_id}/join", response_model=EventJoinLeaveResponse)
+@router.post("/{event_id}/join", response_model=EventAttendanceMutationResponse)
 def join_event(
     event_id: UUID,
     db: DBSession,
     current_user: CurrentUser,
-) -> EventJoinLeaveResponse:
+) -> EventAttendanceMutationResponse:
     event_crud.get_event(db, event_id)
+    existing_participant = event_crud.get_event_participant(
+        db,
+        event_id=event_id,
+        user_id=current_user.id,
+    )
     event_crud.ensure_event_participant(db, event_id=event_id, user_id=current_user.id)
-    return EventJoinLeaveResponse(success=True)
+    return EventAttendanceMutationResponse(
+        success=True,
+        event_id=event_id,
+        is_joined=True,
+        attendee_count=event_crud.count_event_participants(db, event_id=event_id),
+        action="already_joined" if existing_participant is not None else "joined",
+    )
 
 
-@router.post("/{event_id}/leave", response_model=EventJoinLeaveResponse)
+@router.post("/{event_id}/leave", response_model=EventAttendanceMutationResponse)
 def leave_event(
     event_id: UUID,
     db: DBSession,
     current_user: CurrentUser,
-) -> EventJoinLeaveResponse:
+) -> EventAttendanceMutationResponse:
     event_crud.get_event(db, event_id)
-    event_crud.remove_event_participant(db, event_id=event_id, user_id=current_user.id)
-    return EventJoinLeaveResponse(success=True)
+    removed = event_crud.remove_event_participant(
+        db,
+        event_id=event_id,
+        user_id=current_user.id,
+    )
+    return EventAttendanceMutationResponse(
+        success=True,
+        event_id=event_id,
+        is_joined=False,
+        attendee_count=event_crud.count_event_participants(db, event_id=event_id),
+        action="left" if removed else "already_left",
+    )
 
 
 @router.get("/{event_id}/participants", response_model=list[EventParticipantResponse])

@@ -1,4 +1,7 @@
 from datetime import UTC, datetime, timedelta
+import hashlib
+import hmac
+import secrets
 from typing import Any
 
 import bcrypt
@@ -21,6 +24,18 @@ def hash_password(password: str) -> str:
 
 def get_password_hash(password: str) -> str:
     return hash_password(password)
+
+
+def generate_verification_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_verification_code(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+def verify_verification_code(code: str, hashed_code: str) -> bool:
+    return hmac.compare_digest(hash_verification_code(code), hashed_code)
 
 
 def create_access_token(

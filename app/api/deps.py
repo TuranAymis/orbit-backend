@@ -30,15 +30,9 @@ def get_db() -> Generator[Session, None, None]:
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-def get_current_user(
-    db: DBSession,
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-) -> User:
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise AuthenticationError("Not authenticated.")
-
+def get_current_user_from_raw_token(db: Session, token: str) -> User:
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token)
         token_data = TokenPayload.model_validate(payload)
         user_id = UUID(token_data.sub)
     except (JWTError, ValidationError, ValueError) as exc:
@@ -51,6 +45,15 @@ def get_current_user(
         raise AuthorizationError("Inactive user account.")
 
     return user
+
+
+def get_current_user(
+    db: DBSession,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise AuthenticationError("Not authenticated.")
+    return get_current_user_from_raw_token(db, credentials.credentials)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
