@@ -1,5 +1,7 @@
 # Orbit Backend Starter
 
+![CI](https://github.com/TuranAymis/orbit-backend/actions/workflows/ci.yml/badge.svg)
+
 Orbit is a FastAPI starter backend for a local social community and event platform. It includes authentication, modular domain models, PostgreSQL persistence, Alembic migrations, and ready-to-extend routes for users, groups, memberships, events, chats, and payments.
 
 ## Stack
@@ -185,6 +187,7 @@ alembic upgrade head
 ```
 
 - If you need a clean reset during development, drop and recreate the database, then rerun migrations.
+
 ```bash
 python -m app.seed --email owner@example.com --password StrongPass123! --full-name "Orbit Owner"
 ```
