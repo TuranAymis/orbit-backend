@@ -44,11 +44,13 @@ DEFAULT_USERS = (
     },
 )
 
+# Demo groups/events have no cover image on purpose: the old example.com placeholder URLs 404,
+# and the web app shows its own fallback image when cover_image_url is empty.
 DEFAULT_GROUPS = (
     {
         "name": "Orbit Builders",
         "description": "A local-first group for people building Orbit together.",
-        "cover_image_url": "https://example.com/groups/orbit-builders.jpg",
+        "cover_image_url": None,
         "category": "Technology",
         "location": "Remote",
         "owner_email": "free@orbit.local",
@@ -63,7 +65,7 @@ DEFAULT_GROUPS = (
             {
                 "title": "Weekly Build Sync",
                 "description": "Ship check-in for local Orbit development.",
-                "cover_image_url": "https://example.com/events/build-sync.jpg",
+                "cover_image_url": None,
                 "location": "Remote",
                 "start_offset_days": 3,
                 "duration_hours": 2,
@@ -74,7 +76,7 @@ DEFAULT_GROUPS = (
     {
         "name": "Orbit Founders Circle",
         "description": "Founders and operators sharing growth notes.",
-        "cover_image_url": "https://example.com/groups/founders-circle.jpg",
+        "cover_image_url": None,
         "category": "Business",
         "location": "Istanbul",
         "owner_email": "paid@orbit.local",
@@ -89,7 +91,7 @@ DEFAULT_GROUPS = (
             {
                 "title": "Founder Office Hours",
                 "description": "Weekly founder Q&A and planning session.",
-                "cover_image_url": "https://example.com/events/founder-office-hours.jpg",
+                "cover_image_url": None,
                 "location": "Istanbul",
                 "start_offset_days": 5,
                 "duration_hours": 1,
