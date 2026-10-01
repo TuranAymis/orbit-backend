@@ -19,6 +19,7 @@ from app.models.event import Event
 from app.models.group import Group
 from app.models.membership import Membership
 from app.models.notification import Notification
+from app.models.push import NotificationPreference
 from app.models.user import User
 from app.schemas.chat_room import (
     ChatRoomMuteResponse,
@@ -534,6 +535,9 @@ def create_notifications_for_chat_message(
         room_id=room_id,
         sender_id=chat.sender_id,
     )
+    eligible_user_ids = [user_id for user_id in eligible_user_ids
+                         if (preference := db.get(NotificationPreference, (user_id, "chat"))) is None
+                         or preference.enabled]
     if not eligible_user_ids:
         return 0
 

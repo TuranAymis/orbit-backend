@@ -10,13 +10,18 @@ class GroupBase(BaseModel):
     cover_image_url: str | None = Field(default=None, max_length=2048)
     category: str | None = Field(default=None, max_length=255)
     location: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=255)
 
 
 class GroupCreate(GroupBase):
-    pass
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class GroupUpdate(BaseModel):
+    city: str | None = Field(default=None, max_length=255)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     name: str | None = Field(default=None, min_length=2, max_length=255)
     description: str | None = Field(default=None, max_length=4000)
     cover_image_url: str | None = Field(default=None, max_length=2048)

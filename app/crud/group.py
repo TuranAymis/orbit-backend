@@ -19,6 +19,9 @@ def create_group(
     category: str | None,
     location: str | None,
     owner_id: uuid.UUID,
+    city: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> Group:
     group = Group(
         name=name.strip(),
@@ -26,6 +29,9 @@ def create_group(
         cover_image_url=cover_image_url.strip() if cover_image_url else None,
         category=category.strip() if category else None,
         location=location.strip() if location else None,
+        city=city,
+        latitude=latitude,
+        longitude=longitude,
         owner_id=owner_id,
     )
     db.add(group)

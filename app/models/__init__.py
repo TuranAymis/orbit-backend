@@ -29,3 +29,4 @@ __all__ = [
     "AuthAuditLog",
     "EmailVerificationCode",
 ]
+from app.models.push import NotificationPreference, PushSubscription

@@ -21,6 +21,9 @@ def create_event(
     location: str,
     start_time: datetime,
     end_time: datetime,
+    city: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> Event:
     event = Event(
         group_id=group_id,
@@ -28,6 +31,9 @@ def create_event(
         description=description.strip() if description else None,
         cover_image_url=cover_image_url.strip() if cover_image_url else None,
         location=location.strip(),
+        city=city,
+        latitude=latitude,
+        longitude=longitude,
         start_time=start_time,
         end_time=end_time,
     )

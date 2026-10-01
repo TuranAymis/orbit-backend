@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     )
 
     APP_NAME: str = "Orbit API"
+    VAPID_PUBLIC_KEY: str | None = None
+    VAPID_PRIVATE_KEY: str | None = None
+    VAPID_SUBJECT: str | None = None
     DEBUG: bool = True
     DATABASE_URL: str = "postgresql+psycopg://postgres:123456@localhost:5432/orbit_db"
     JWT_SECRET_KEY: str = "change-this-in-production"

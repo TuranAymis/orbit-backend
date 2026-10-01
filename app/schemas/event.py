@@ -11,11 +11,16 @@ class EventBase(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     cover_image_url: str | None = Field(default=None, max_length=2048)
     location: str = Field(..., min_length=2, max_length=255)
+    city: str | None = Field(default=None, max_length=255)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     start_time: datetime
     end_time: datetime
 
     @model_validator(mode="after")
     def validate_times(self) -> Self:
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together.")
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time.")
         return self
@@ -30,6 +35,9 @@ class EventUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     cover_image_url: str | None = Field(default=None, max_length=2048)
     location: str | None = Field(default=None, min_length=2, max_length=255)
+    city: str | None = Field(default=None, max_length=255)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     start_time: datetime | None = None
     end_time: datetime | None = None
 
@@ -53,6 +61,7 @@ class EventRead(BaseModel):
     description: str | None
     cover_image_url: str | None
     location: str
+    city: str | None = None
     start_time: datetime
     end_time: datetime
     created_at: datetime
