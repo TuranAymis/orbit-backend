@@ -1,0 +1,3 @@
+# Realtime chat
+
+The server uses FastAPI's native WebSocket at `/ws/chat` with the browser WebSocket API. A JWT may be sent as a `token` query parameter. The server rejects missing or invalid tokens before accepting. Clients join `group_id` or `event_id` rooms with `chat:join`; authorization follows the existing active group membership check. `chat:send` persists before the `chat:message` broadcast. The server sends `chat:ping` after 30 seconds without a message and answers client `chat:ping` with `chat:pong`. Reconnect clients call `GET /chats?group_id=...&after_id=...` or use `chat:sync`; cursors must belong to the room. The manager is process local, so multiworker deployments require a shared broker before scaling horizontally.

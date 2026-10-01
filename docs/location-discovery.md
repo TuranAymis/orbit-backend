@@ -1,0 +1,3 @@
+# Location discovery
+
+Events and groups store optional latitude, longitude and city. Group read responses never expose exact coordinates. `/discover/nearby` validates coordinates and radius, applies a bounding box with a coordinate index, then calculates haversine distance in PostgreSQL. Responses contain rounded kilometre distances and no exact coordinates. Existing category filters apply. The current group model has no private visibility flag; if private groups are added, filter them before returning event records. PostGIS would improve spatial indexes and large radius queries, but requires an extension and new dependency management. Reassess when query volume or explain plans warrant it.

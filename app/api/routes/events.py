@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentAdmin, CurrentUser, DBSession, OptionalCurrentUser
@@ -13,6 +14,7 @@ from app.crud import group_moderator as group_moderator_crud
 from app.crud import membership as membership_crud
 from app.crud import user as user_crud
 from app.models.user import User
+from app.models.membership import Membership
 from app.schemas.event import (
     EventCreate,
     EventDetailResponse,
@@ -109,20 +111,32 @@ def _ensure_event_deleter(db: Session, event_id: UUID, current_user: User) -> No
 @router.post("", response_model=EventRead, status_code=status.HTTP_201_CREATED)
 def create_event(
     payload: EventCreate,
+    background_tasks: BackgroundTasks,
     db: DBSession,
     current_user: CurrentUser,
 ) -> EventRead:
     _ensure_event_creator(db, payload.group_id, current_user)
-    return event_crud.create_event(
+    event = event_crud.create_event(
         db,
         group_id=payload.group_id,
         title=payload.title,
         description=payload.description,
         cover_image_url=payload.cover_image_url,
         location=payload.location,
+        city=payload.city,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         start_time=payload.start_time,
         end_time=payload.end_time,
     )
+    from app.services.push_dispatcher import dispatch_in_background
+    member_ids = list(db.scalars(select(Membership.user_id).where(
+        Membership.group_id == event.group_id, Membership.status == MembershipStatus.ACTIVE,
+        Membership.user_id != current_user.id,
+    )).all())
+    background_tasks.add_task(dispatch_in_background, member_ids, "event",
+                              "Etkinlik oluşturuldu", event.title, "event", event.id)
+    return event
 
 
 @router.get("", response_model=list[EventListResponse])

@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from pydantic import ValidationError
 
@@ -215,15 +217,30 @@ async def websocket_chat(websocket: WebSocket) -> None:
         data={"success": True, "user_id": str(current_user.id)},
     )
 
+    awaiting_pong = False
     try:
         while True:
-            message = await websocket.receive_json()
+            try:
+                message = await asyncio.wait_for(websocket.receive_json(), timeout=30)
+            except asyncio.TimeoutError:
+                if awaiting_pong:
+                    await websocket.close(code=status.WS_1001_GOING_AWAY, reason="Heartbeat timeout")
+                    break
+                awaiting_pong = True
+                await chat_connection_manager.send_event(websocket, event="chat:ping", data={})
+                continue
             event = message.get("event")
             payload = message.get("data", {})
             request_id = message.get("request_id")
 
             try:
-                if event == "chat:join":
+                if event == "chat:ping":
+                    awaiting_pong = False
+                    await chat_connection_manager.send_event(websocket, event="chat:pong", data={})
+                elif event == "chat:pong":
+                    awaiting_pong = False
+                    continue
+                elif event == "chat:join":
                     await _handle_join(
                         websocket,
                         current_user=current_user,
@@ -266,5 +283,7 @@ async def websocket_chat(websocket: WebSocket) -> None:
                     success=False,
                     error=error_message,
                 )
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
         await chat_connection_manager.disconnect(websocket)

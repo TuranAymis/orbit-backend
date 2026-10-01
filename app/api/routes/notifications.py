@@ -67,3 +67,71 @@ def mark_notification_read(
     )
     notification_crud.mark_notification_as_read(db, notification=notification)
     return NotificationMarkReadResponse(success=True)
+
+from fastapi import BackgroundTasks, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from app.models.push import NotificationPreference, PushSubscription
+from app.core.config import settings
+
+CATEGORIES = ("chat", "event", "group")
+
+class PreferenceUpdate(BaseModel):
+    enabled: bool
+
+class SubscriptionKeys(BaseModel):
+    p256dh: str = Field(min_length=1)
+    auth: str = Field(min_length=1)
+
+class SubscriptionCreate(BaseModel):
+    endpoint: str = Field(min_length=8, max_length=4096)
+    keys: SubscriptionKeys
+
+@router.get("/preferences")
+def list_preferences(db: DBSession, current_user: CurrentUser) -> dict[str, bool]:
+    stored = db.scalars(select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)).all()
+    values = {item.category: item.enabled for item in stored}
+    return {category: values.get(category, True) for category in CATEGORIES}
+
+@router.put("/preferences/{category}")
+def update_preference(category: str, payload: PreferenceUpdate, db: DBSession, current_user: CurrentUser) -> dict:
+    if category not in CATEGORIES:
+        raise HTTPException(status_code=400, detail="Unknown notification category")
+    preference = db.get(NotificationPreference, (current_user.id, category))
+    if preference is None:
+        preference = NotificationPreference(user_id=current_user.id, category=category)
+        db.add(preference)
+    preference.enabled = payload.enabled
+    db.commit()
+    return {"category": category, "enabled": preference.enabled}
+
+@router.get("/push/config")
+def push_config() -> dict:
+    return {"public_key": settings.VAPID_PUBLIC_KEY}
+
+@router.post("/push/subscriptions", status_code=201)
+def register_subscription(payload: SubscriptionCreate, request: Request, db: DBSession, current_user: CurrentUser) -> dict:
+    if not payload.endpoint.startswith("https://"):
+        raise HTTPException(status_code=422, detail="Push endpoint must use HTTPS")
+    subscription = db.scalar(select(PushSubscription).where(PushSubscription.endpoint == payload.endpoint))
+    if subscription is not None and subscription.user_id != current_user.id:
+        raise HTTPException(status_code=409, detail="Subscription already registered")
+    if subscription is None:
+        subscription = PushSubscription(user_id=current_user.id, endpoint=payload.endpoint)
+        db.add(subscription)
+    subscription.p256dh = payload.keys.p256dh
+    subscription.auth = payload.keys.auth
+    subscription.user_agent = request.headers.get("user-agent", "")[:512]
+    db.commit()
+    return {"id": subscription.id, "endpoint": subscription.endpoint}
+
+class SubscriptionDelete(BaseModel):
+    endpoint: str
+
+@router.delete("/push/subscriptions", status_code=204)
+def delete_subscription(payload: SubscriptionDelete, db: DBSession, current_user: CurrentUser) -> None:
+    subscription = db.scalar(select(PushSubscription).where(PushSubscription.endpoint == payload.endpoint,
+                                                             PushSubscription.user_id == current_user.id))
+    if subscription is not None:
+        db.delete(subscription)
+        db.commit()

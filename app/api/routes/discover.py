@@ -55,3 +55,14 @@ def get_discover(
         new_groups_sort=new_groups_sort,
     )
     return discover_service.get_discover_feed(db, params=params)
+
+@router.get("/nearby")
+def get_nearby_events(
+    db: DBSession,
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    radius_km: float = Query(25, gt=0, le=500),
+    category: str | None = Query(default=None),
+) -> list[dict]:
+    from app.services.location_discovery import nearby_events
+    return nearby_events(db, lat=lat, lon=lon, radius_km=radius_km, category=category)

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Query, Response, status
 
 from app.api.deps import CurrentAdmin, CurrentUser, DBSession
 from app.core.exceptions import AuthorizationError
@@ -32,18 +32,26 @@ router = APIRouter(prefix="/groups", tags=["Groups"])
 @router.post("", response_model=GroupRead, status_code=status.HTTP_201_CREATED)
 def create_group(
     payload: GroupCreate,
+    background_tasks: BackgroundTasks,
     db: DBSession,
     current_user: CurrentAdmin,
 ) -> GroupRead:
-    return group_crud.create_group(
+    group = group_crud.create_group(
         db,
         name=payload.name,
         description=payload.description,
         cover_image_url=payload.cover_image_url,
         category=payload.category,
         location=payload.location,
+        city=payload.city,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         owner_id=current_user.id,
     )
+    from app.services.push_dispatcher import dispatch_in_background
+    background_tasks.add_task(dispatch_in_background, [current_user.id], "group",
+                              "Grup oluşturuldu", group.name, "group", group.id)
+    return group
 
 
 @router.get("", response_model=list[GroupListResponse])
