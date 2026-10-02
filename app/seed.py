@@ -93,6 +93,9 @@ DEFAULT_GROUPS = (
                 "description": "Weekly founder Q&A and planning session.",
                 "cover_image_url": None,
                 "location": "Istanbul",
+                "city": "Istanbul",
+                "latitude": 41.0082,
+                "longitude": 28.9784,
                 "start_offset_days": 5,
                 "duration_hours": 1,
                 "participants": ["paid@orbit.local"],
@@ -285,6 +288,9 @@ def seed_default_groups(db) -> None:
                     description=event_data["description"],
                     cover_image_url=event_data["cover_image_url"],
                     location=event_data["location"],
+                    city=event_data.get("city"),
+                    latitude=event_data.get("latitude"),
+                    longitude=event_data.get("longitude"),
                     start_time=start_time,
                     end_time=end_time,
                 )
@@ -297,6 +303,9 @@ def seed_default_groups(db) -> None:
                         "description": event_data["description"],
                         "cover_image_url": event_data["cover_image_url"],
                         "location": event_data["location"],
+                        "city": event_data.get("city"),
+                        "latitude": event_data.get("latitude"),
+                        "longitude": event_data.get("longitude"),
                     },
                 )
 
