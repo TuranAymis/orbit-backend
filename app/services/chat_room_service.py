@@ -509,13 +509,12 @@ def get_notification_eligible_user_ids_for_message(
     if not candidate_ids:
         return []
 
-    muted_stmt = select(ChatRoomState.user_id).where(
-        ChatRoomState.room_type == room_type.value,
-        ChatRoomState.room_id == room_id,
-        ChatRoomState.is_muted.is_(True),
-        ChatRoomState.user_id.in_(candidate_ids),
+    muted_user_ids = chat_room_state_crud.list_muted_user_ids(
+        db,
+        room_type=room_type,
+        room_id=room_id,
+        user_ids=candidate_ids,
     )
-    muted_user_ids = set(db.scalars(muted_stmt).all())
     return sorted(candidate_ids - muted_user_ids, key=str)
 
 

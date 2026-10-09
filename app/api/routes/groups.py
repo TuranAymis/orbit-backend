@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Query, Response, status
 
-from app.api.deps import CurrentAdmin, CurrentUser, DBSession
+from app.api.deps import CurrentAdmin, CurrentUser, DBSession, OptionalCurrentUser
 from app.core.exceptions import AuthorizationError
 from app.crud import chat_room_state as chat_room_state_crud
 from app.crud import event as event_crud
@@ -10,6 +10,7 @@ from app.crud import group as group_crud
 from app.crud import group_moderator as group_moderator_crud
 from app.crud import membership as membership_crud
 from app.crud import user as user_crud
+from app.api.routes.events import can_create_events_in_group
 from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
 from app.schemas.group import (
     GroupDetailResponse,
@@ -57,10 +58,15 @@ def create_group(
 @router.get("", response_model=list[GroupListResponse])
 def list_groups(
     db: DBSession,
+    current_user: OptionalCurrentUser,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
 ) -> list[GroupListResponse]:
     groups = group_crud.list_groups(db, skip=skip, limit=limit)
+    active_group_ids = (
+        membership_crud.list_active_group_ids_by_user(db, user_id=current_user.id)
+        if current_user is not None and groups else set()
+    )
     return [
         GroupListResponse(
             id=group.id,
@@ -68,6 +74,7 @@ def list_groups(
             description=group.description,
             member_count=membership_crud.count_memberships_by_group(db, group_id=group.id),
             image_url=group.cover_image_url,
+            is_joined=group.id in active_group_ids,
         )
         for group in groups
     ]
@@ -94,9 +101,10 @@ def get_group(group_id: UUID, db: DBSession, current_user: CurrentUser) -> Group
         description=group.description,
         cover_image_url=group.cover_image_url,
         member_count=member_count,
-        is_joined=membership is not None,
+        is_joined=membership is not None and membership.status == MembershipStatus.ACTIVE,
         category=group.category,
         location=group.location,
+        can_create_events=can_create_events_in_group(db, group.id, current_user),
         founder=GroupFounderResponse(id=group.owner.id, name=group.owner.full_name),
         stats=GroupStatsResponse(posts=0, events=len(group.events), members=member_count),
         upcoming_events=[
@@ -171,6 +179,8 @@ def join_group(
         user_id=current_user.id,
         group_id=group_id,
     )
+    if existing_membership is not None and existing_membership.status == MembershipStatus.BANNED:
+        raise AuthorizationError("You are banned from this group.")
     membership_crud.ensure_group_membership(
         db,
         user_id=current_user.id,

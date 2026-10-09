@@ -44,6 +44,7 @@ class GroupListResponse(BaseModel):
     description: str | None = None
     member_count: int
     image_url: str | None = None
+    is_joined: bool = False
 
 
 class GroupFounderResponse(BaseModel):
@@ -76,6 +77,7 @@ class GroupDetailResponse(BaseModel):
     cover_image_url: str | None = None
     member_count: int
     is_joined: bool
+    can_create_events: bool = False
     category: str | None = None
     location: str | None = None
     founder: GroupFounderResponse

@@ -40,6 +40,7 @@ def count_recent_events_by_email(
     email: str,
     event_type: str,
     within: timedelta,
+    ip_address: str | None = None,
 ) -> int:
     cutoff = datetime.now(UTC) - within
     stmt = select(func.count()).select_from(AuthAuditLog).where(
@@ -47,6 +48,8 @@ def count_recent_events_by_email(
         AuthAuditLog.event_type == event_type,
         AuthAuditLog.created_at >= cutoff,
     )
+    if ip_address is not None:
+        stmt = stmt.where(AuthAuditLog.ip_address == ip_address)
     return int(db.scalar(stmt) or 0)
 
 

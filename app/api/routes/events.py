@@ -54,8 +54,36 @@ def _ensure_event_creator(db: Session, group_id: UUID, current_user: User) -> No
     raise AuthorizationError("Moderator or admin access is required to create events.")
 
 
+def can_create_events_in_group(db: Session, group_id: UUID, user: User | None) -> bool:
+    if user is None:
+        return False
+    if user.role == UserRole.ADMIN:
+        return True
+    return (
+        user.role == UserRole.MODERATOR
+        and group_moderator_crud.get_group_moderator(db, group_id=group_id, user_id=user.id)
+        is not None
+    )
+
+
+def can_delete_event(db: Session, event, user: User | None) -> bool:
+    if user is None:
+        return False
+    if user.role == UserRole.ADMIN:
+        return True
+    if user.role != UserRole.MODERATOR:
+        return False
+    return (
+        group_moderator_crud.get_group_moderator(db, group_id=event.group_id, user_id=user.id)
+        is not None
+        or event_moderator_crud.get_event_moderator(db, event_id=event.id, user_id=user.id)
+        is not None
+    )
+
+
 def _ensure_group_manager(db: Session, group_id: UUID, current_user: User) -> None:
-    if current_user.role in {UserRole.MODERATOR, UserRole.ADMIN}:
+    # Moderators are scoped: only admins skip the group-level checks below.
+    if current_user.role == UserRole.ADMIN:
         return
 
     if group_moderator_crud.get_group_moderator(
@@ -134,8 +162,16 @@ def create_event(
         Membership.group_id == event.group_id, Membership.status == MembershipStatus.ACTIVE,
         Membership.user_id != current_user.id,
     )).all())
-    background_tasks.add_task(dispatch_in_background, member_ids, "event",
-                              "Etkinlik oluşturuldu", event.title, "event", event.id)
+    muted_user_ids = chat_room_state_crud.list_muted_user_ids(
+        db,
+        room_type=ChatRoomType.GROUP,
+        room_id=event.group_id,
+        user_ids=member_ids,
+    )
+    recipients = [user_id for user_id in member_ids if user_id not in muted_user_ids]
+    if recipients:
+        background_tasks.add_task(dispatch_in_background, recipients, "event",
+                                  "Etkinlik oluşturuldu", event.title, "event", event.id)
     return event
 
 
@@ -204,6 +240,7 @@ def get_event(
             if event.group is not None
             else None
         ),
+        can_manage=can_delete_event(db, event, current_user),
         participants_preview=[
             EventParticipantPreviewResponse(
                 id=participant.id,
