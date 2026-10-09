@@ -191,3 +191,14 @@ alembic upgrade head
 ```bash
 python -m app.seed --email owner@example.com --password StrongPass123! --full-name "Orbit Owner"
 ```
+
+### API integration tests
+
+Start a dedicated PostgreSQL database, then run pytest with its URL. The test harness applies Alembic migrations and clears application tables between API tests.
+
+```bash
+docker run -d --name orbit-test-pg -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=orbit_test -p 55433:5432 postgres:16
+ORBIT_TEST_DATABASE_URL=postgresql+psycopg://postgres:pw@localhost:55433/orbit_test python -m pytest
+```
+
+FastAPI's `TestClient` requires `httpx` in the test environment. Without `ORBIT_TEST_DATABASE_URL`, API integration tests skip.
