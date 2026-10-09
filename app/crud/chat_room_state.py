@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.chat_room_state import ChatRoomState
@@ -34,6 +34,29 @@ def list_chat_room_states_by_user(
         stmt = stmt.where(ChatRoomState.room_type == room_type.value)
     stmt = stmt.order_by(ChatRoomState.updated_at.desc(), ChatRoomState.id.desc())
     return list(db.scalars(stmt).all())
+
+
+def list_muted_user_ids(
+    db: Session,
+    *,
+    room_type: ChatRoomType,
+    room_id: uuid.UUID,
+    user_ids: list[uuid.UUID] | set[uuid.UUID],
+) -> set[uuid.UUID]:
+    if not user_ids:
+        return set()
+
+    stmt = select(ChatRoomState.user_id).where(
+        ChatRoomState.room_type == room_type.value,
+        ChatRoomState.room_id == room_id,
+        ChatRoomState.user_id.in_(user_ids),
+        ChatRoomState.is_muted.is_(True),
+        or_(
+            ChatRoomState.muted_until.is_(None),
+            ChatRoomState.muted_until > datetime.now(UTC),
+        ),
+    )
+    return set(db.scalars(stmt).all())
 
 
 def ensure_chat_room_state(

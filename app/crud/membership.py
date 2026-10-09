@@ -23,6 +23,14 @@ def get_membership_by_user_group(
     return db.scalar(stmt)
 
 
+def list_active_group_ids_by_user(db: Session, *, user_id: uuid.UUID) -> set[uuid.UUID]:
+    stmt = select(Membership.group_id).where(
+        Membership.user_id == user_id,
+        Membership.status == MembershipStatus.ACTIVE,
+    )
+    return set(db.scalars(stmt).all())
+
+
 def create_membership(
     db: Session,
     *,
@@ -70,7 +78,11 @@ def count_memberships_by_group(
     *,
     group_id: uuid.UUID,
 ) -> int:
-    return len(list_memberships_by_group(db, group_id=group_id))
+    return sum(
+        1
+        for membership in list_memberships_by_group(db, group_id=group_id)
+        if membership.status == MembershipStatus.ACTIVE
+    )
 
 
 def list_group_users(
@@ -81,7 +93,10 @@ def list_group_users(
     stmt = (
         select(User)
         .join(Membership, Membership.user_id == User.id)
-        .where(Membership.group_id == group_id)
+        .where(
+            Membership.group_id == group_id,
+            Membership.status == MembershipStatus.ACTIVE,
+        )
         .order_by(Membership.joined_at.asc())
     )
     return list(db.scalars(stmt).all())
@@ -120,7 +135,8 @@ def remove_group_membership(
     group_id: uuid.UUID,
 ) -> bool:
     membership = get_membership_by_user_group(db, user_id=user_id, group_id=group_id)
-    if membership is None:
+    if membership is None or membership.status == MembershipStatus.BANNED:
+        # A ban must survive "leave"; otherwise the user could clear it and rejoin.
         return False
 
     db.delete(membership)

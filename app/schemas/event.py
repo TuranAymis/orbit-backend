@@ -102,6 +102,7 @@ class EventDetailResponse(BaseModel):
     attendee_count: int
     is_joined: bool
     related_group: EventRelatedGroupResponse | None = None
+    can_manage: bool = False
     participants_preview: list[EventParticipantPreviewResponse] = Field(default_factory=list)
 
 

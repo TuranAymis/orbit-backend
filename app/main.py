@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.chats import router as chats_router
@@ -16,9 +18,35 @@ from app.api.routes.payments import router as payments_router
 from app.api.routes.profile import router as profile_router
 from app.api.routes.settings import router as settings_router
 from app.api.routes.users import router as users_router
-from app.core.config import settings
+from app.core.config import settings, validate_production_settings
 from app.core.exceptions import AppException
 
+
+class SecurityHeadersMiddleware:
+    def __init__(self, app: ASGIApp, *, production: bool) -> None:
+        self.app = app
+        self.production = production
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["X-Content-Type-Options"] = "nosniff"
+                headers["X-Frame-Options"] = "DENY"
+                headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+                if self.production:
+                    headers["Strict-Transport-Security"] = "max-age=31536000"
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+validate_production_settings(settings)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -34,6 +62,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware, production=settings.ENVIRONMENT == "production")
 
 
 @app.exception_handler(AppException)

@@ -64,12 +64,14 @@ def _enforce_rate_limit(
     window_minutes: int,
     max_attempts: int,
     detail: str,
+    ip_address: str | None = None,
 ) -> None:
     recent_attempts = auth_audit_log_crud.count_recent_events_by_email(
         db,
         email=email,
         event_type=event_type,
         within=timedelta(minutes=window_minutes),
+        ip_address=ip_address,
     )
     if recent_attempts >= max_attempts:
         raise RateLimitError(detail)
@@ -191,8 +193,25 @@ def authenticate_user(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> User:
+    _enforce_rate_limit(
+        db,
+        email=email,
+        event_type="login_failed",
+        window_minutes=settings.AUTH_LOGIN_RATE_LIMIT_WINDOW_MINUTES,
+        max_attempts=settings.AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
+        detail="Too many login attempts. Please try again later.",
+        # Count per email AND client address so a stranger cannot lock the real user out.
+        ip_address=ip_address,
+    )
     user = user_crud.get_user_by_email(db, email)
     if user is None or not verify_password(password, user.password_hash):
+        _record_auth_event(
+            db,
+            event_type="login_failed",
+            email=email,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise AuthenticationError("Incorrect email or password.")
     if not user.is_active:
         _record_auth_event(
