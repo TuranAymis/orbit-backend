@@ -11,6 +11,15 @@ from app.models.push import NotificationPreference, PushSubscription
 
 logger = logging.getLogger(__name__)
 
+PUSH_TTL_SECONDS = 24 * 60 * 60
+# Push services answer 404/410 once a browser subscription has been revoked or has expired.
+GONE_STATUS_CODES = {404, 410}
+
+
+def is_gone(error: Exception) -> bool:
+    response = getattr(error, "response", None)
+    return getattr(response, "status_code", None) in GONE_STATUS_CODES
+
 
 class PushSender(Protocol):
     def send(self, subscription: PushSubscription, payload: dict) -> None: ...
@@ -23,7 +32,7 @@ class LoggingPushSender:
 
 class WebPushSender:
     def __init__(self, private_key: str, subject: str):
-        from pywebpush import webpush  # type: ignore[import-not-found]  # Optional deployment extra.
+        from pywebpush import webpush  # Imported lazily so the app still starts if the package is missing.
         self._webpush = webpush
         self._private_key = private_key
         self._subject = subject
@@ -32,7 +41,7 @@ class WebPushSender:
         self._webpush(
             subscription_info={"endpoint": subscription.endpoint, "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth}},
             data=json.dumps(payload), vapid_private_key=self._private_key,
-            vapid_claims={"sub": self._subject},
+            vapid_claims={"sub": self._subject}, ttl=PUSH_TTL_SECONDS,
         )
 
 
@@ -68,8 +77,22 @@ class NotificationDispatcher:
                 try:
                     self.sender.send(subscription, {"title": title, "body": message,
                                                     "notification_id": str(notification.id)})
-                except Exception:
-                    logger.exception("Push delivery failed for subscription %s", subscription.id)
+                except Exception as error:
+                    if is_gone(error):
+                        # The browser revoked this subscription; stop sending to it.
+                        self._forget(db, subscription)
+                    else:
+                        logger.exception("Push delivery failed for subscription %s", subscription.id)
+
+
+    @staticmethod
+    def _forget(db: Session, subscription: PushSubscription) -> None:
+        try:
+            db.delete(subscription)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Could not remove stale push subscription %s", subscription.id)
 
 
 def dispatch_in_background(user_ids: list[UUID], category: str, title: str, message: str,
