@@ -24,6 +24,7 @@ from app.schemas.group import (
     GroupStatsResponse,
 )
 from app.utils.enums import ChatRoomType, MembershipRole, MembershipStatus
+from app.services.badge_service import evaluate_badges_best_effort
 from datetime import UTC, datetime
 
 
@@ -49,6 +50,7 @@ def create_group(
         longitude=payload.longitude,
         owner_id=current_user.id,
     )
+    evaluate_badges_best_effort(db, current_user.id)
     from app.services.push_dispatcher import dispatch_in_background
     background_tasks.add_task(dispatch_in_background, [current_user.id], "group",
                               "Grup oluşturuldu", group.name, "group", group.id)
@@ -188,6 +190,7 @@ def join_group(
         role=MembershipRole.MEMBER,
         status=MembershipStatus.ACTIVE,
     )
+    evaluate_badges_best_effort(db, current_user.id)
     return GroupMembershipMutationResponse(
         success=True,
         group_id=group_id,

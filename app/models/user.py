@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.models.notification import Notification
     from app.models.payment import Payment
     from app.models.user_settings import UserSettings
+    from app.models.user_badge import UserBadge
 
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -60,6 +61,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     memberships: Mapped[list["Membership"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    badges: Mapped[list["UserBadge"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
     )
     payments: Mapped[list["Payment"]] = relationship(
         back_populates="user",

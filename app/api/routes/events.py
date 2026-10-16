@@ -15,6 +15,7 @@ from app.crud import membership as membership_crud
 from app.crud import user as user_crud
 from app.models.user import User
 from app.models.membership import Membership
+from app.services.badge_service import evaluate_badges_best_effort
 from app.schemas.event import (
     EventCreate,
     EventDetailResponse,
@@ -304,6 +305,7 @@ def join_event(
         user_id=current_user.id,
     )
     event_crud.ensure_event_participant(db, event_id=event_id, user_id=current_user.id)
+    evaluate_badges_best_effort(db, current_user.id)
     return EventAttendanceMutationResponse(
         success=True,
         event_id=event_id,

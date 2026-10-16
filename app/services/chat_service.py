@@ -14,6 +14,7 @@ from app.services.chat_room_service import (
     sync_sender_read_state_for_message,
 )
 from app.utils.enums import MembershipStatus
+from app.services.badge_service import evaluate_badges_best_effort
 
 
 def to_chat_read(chat) -> ChatRead:
@@ -93,4 +94,5 @@ def persist_chat_message(
         created_at=chat.created_at,
     )
     create_notifications_for_chat_message(db, chat=chat)
+    evaluate_badges_best_effort(db, current_user.id)
     return to_chat_read(chat)

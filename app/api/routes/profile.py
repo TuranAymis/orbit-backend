@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.deps import CurrentUser, DBSession
 from app.crud import user as user_crud
 from app.schemas.user import ProfileResponse, ProfileUpdateRequest
+from app.services.badge_service import evaluate_badges_best_effort
 
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
@@ -19,7 +20,7 @@ def update_profile(
     db: DBSession,
     current_user: CurrentUser,
 ) -> ProfileResponse:
-    return user_crud.update_user_profile(
+    user = user_crud.update_user_profile(
         db,
         user=current_user,
         full_name=payload.full_name,
@@ -27,3 +28,5 @@ def update_profile(
         location=payload.location,
         avatar_url=payload.avatar_url,
     )
+    evaluate_badges_best_effort(db, current_user.id)
+    return user

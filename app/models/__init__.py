@@ -11,10 +11,12 @@ from app.models.membership import Membership
 from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.user import User
+from app.models.user_badge import UserBadge
 from app.models.user_settings import UserSettings
 
 __all__ = [
     "User",
+    "UserBadge",
     "UserSettings",
     "Group",
     "Membership",
